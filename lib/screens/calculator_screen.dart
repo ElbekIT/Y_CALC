@@ -198,14 +198,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     }
 
     final buffer = StringBuffer();
-    buffer.writeln("🧾 *Y CALC HISOB CHEKI*");
+    buffer.writeln("🧾 *ALGORIX HISOB CHEKI*");
     buffer.writeln("📅 Sana: ${DateTime.now().day}.${DateTime.now().month}.${DateTime.now().year}");
     buffer.writeln("--------------------------");
     for (var item in _calc.history) {
       buffer.writeln("${item.expression} = *${item.result}*");
     }
     buffer.writeln("--------------------------");
-    buffer.writeln("🚀 Y Calc ilovasi orqali hisoblandi");
+    buffer.writeln("🚀 ALGORIX ilovasi orqali hisoblandi");
 
     Clipboard.setData(ClipboardData(text: buffer.toString()));
     HapticFeedback.mediumImpact();
@@ -415,7 +415,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                "Y CALC",
+                "ALGORIX",
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,

@@ -16,16 +16,16 @@ void main() {
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const YCalcApp());
+  runApp(const AlgorixApp());
 }
 
-class YCalcApp extends StatelessWidget {
-  const YCalcApp({super.key});
+class AlgorixApp extends StatelessWidget {
+  const AlgorixApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Y Calc',
+      title: 'ALGORIX',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
