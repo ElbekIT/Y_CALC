@@ -1,108 +1,119 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../themes/app_theme.dart';
 
 class DisplayPanel extends StatelessWidget {
+  final String expression;
   final String display;
-  final String history;
+  final String livePreview;
+  final String lastFullExpression;
   final bool hasError;
+  final AppPalette palette;
+  final VoidCallback onBackspace;
 
   const DisplayPanel({
     super.key,
+    required this.expression,
     required this.display,
-    required this.history,
-    this.hasError = false,
+    required this.livePreview,
+    required this.lastFullExpression,
+    required this.hasError,
+    required this.palette,
+    required this.onBackspace,
   });
 
   double _getFontSize(String text) {
-    if (text.length <= 6) return 72;
-    if (text.length <= 9) return 58;
-    if (text.length <= 12) return 46;
-    if (text.length <= 15) return 36;
-    return 28;
+    if (text.length <= 6) return 56;
+    if (text.length <= 9) return 46;
+    if (text.length <= 12) return 38;
+    if (text.length <= 16) return 30;
+    return 24;
+  }
+
+  void _copyToClipboard(BuildContext context) {
+    Clipboard.setData(ClipboardData(text: display));
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("Nusxa olindi: $display"),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: palette.bgCard,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.bgPrimary,
-            AppColors.bgSecondary,
-          ],
-        ),
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.accentPurple.withOpacity(0.2),
-            width: 1,
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        // Chapga yoki o'ngga surilsa - o'chirish (backspace)
+        if (details.primaryVelocity != null && details.primaryVelocity!.abs() > 100) {
+          HapticFeedback.selectionClick();
+          onBackspace();
+        }
+      },
+      onLongPress: () => _copyToClipboard(context),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        decoration: BoxDecoration(
+          color: palette.bgPrimary,
+          border: Border(
+            bottom: BorderSide(color: palette.divider.withOpacity(0.4), width: 1),
           ),
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          // History row
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: history.isNotEmpty
-                ? Text(
-                    key: ValueKey(history),
-                    history,
-                    textAlign: TextAlign.right,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      color: AppColors.displaySubText,
-                      letterSpacing: 0.5,
-                    ),
-                  )
-                : const SizedBox(height: 22),
-          ),
-          const SizedBox(height: 8),
-          // Main display
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 150),
-            transitionBuilder: (child, anim) => FadeTransition(
-              opacity: anim,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.0, 0.1),
-                  end: Offset.zero,
-                ).animate(anim),
-                child: child,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            // Oxirgi hisob ifodasi
+            if (lastFullExpression.isNotEmpty)
+              Text(
+                lastFullExpression,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: palette.displaySubText.withOpacity(0.7),
+                  fontWeight: FontWeight.w400,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            child: Text(
-              key: ValueKey(display),
+
+            const SizedBox(height: 4),
+
+            // Asosiy kiritilayotgan ifoda yoki raqam
+            Text(
               display,
-              textAlign: TextAlign.right,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: _getFontSize(display),
-                fontWeight: FontWeight.w300,
-                color: hasError
-                    ? const Color(0xFFFF5252)
-                    : AppColors.displayText,
-                letterSpacing: -1,
-                shadows: hasError
-                    ? []
-                    : [
-                        Shadow(
-                          color: AppColors.accentCyan.withOpacity(0.3),
-                          blurRadius: 20,
-                        ),
-                      ],
+                fontWeight: FontWeight.w400,
+                color: hasError ? const Color(0xFFEF4444) : palette.displayText,
+                letterSpacing: -0.5,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
             ),
-          ),
-        ],
+
+            // Jonli hisoblash natijasi (Live Preview)
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              height: livePreview.isNotEmpty ? 28 : 8,
+              alignment: Alignment.centerRight,
+              child: livePreview.isNotEmpty
+                  ? Text(
+                      "= $livePreview",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w500,
+                        color: palette.accent,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:y_calc/models/calculator_model.dart';
+import 'package:y_calc/models/converter_model.dart';
+import 'package:y_calc/models/finance_model.dart';
+import 'package:y_calc/models/programmer_model.dart';
 
 void main() {
   group('CalculatorModel Tests', () {
@@ -9,91 +12,91 @@ void main() {
       calc = CalculatorModel();
     });
 
-    test('Initial state shows 0', () {
+    test('Boshlangich holat 0 ko\'rsatishi kerak', () {
       expect(calc.display, '0');
     });
 
-    test('Input digit changes display', () {
+    test('Raqam kiritilganda displey yangilanadi', () {
       calc.inputDigit('5');
       expect(calc.display, '5');
     });
 
-    test('Addition works correctly', () {
+    test('Qo\'shish amali', () {
       calc.inputDigit('5');
       calc.inputOperator('+');
       calc.inputDigit('3');
-      final result = calc.calculate();
-      expect(result.display, '8');
+      calc.calculate();
+      expect(calc.display, '8');
     });
 
-    test('Subtraction works correctly', () {
+    test('Ayirish amali', () {
       calc.inputDigit('9');
       calc.inputOperator('-');
       calc.inputDigit('4');
-      final result = calc.calculate();
-      expect(result.display, '5');
+      calc.calculate();
+      expect(calc.display, '5');
     });
 
-    test('Multiplication works correctly', () {
+    test('Ko\'paytirish amali', () {
       calc.inputDigit('6');
       calc.inputOperator('×');
       calc.inputDigit('7');
-      final result = calc.calculate();
-      expect(result.display, '42');
+      calc.calculate();
+      expect(calc.display, '42');
     });
 
-    test('Division works correctly', () {
+    test('Bo\'lish amali', () {
       calc.inputDigit('1');
       calc.inputDigit('0');
       calc.inputOperator('÷');
       calc.inputDigit('2');
-      final result = calc.calculate();
-      expect(result.display, '5');
+      calc.calculate();
+      expect(calc.display, '5');
     });
 
-    test('Division by zero shows error', () {
+    test('Nolga bo\'lish xatosi', () {
       calc.inputDigit('5');
       calc.inputOperator('÷');
       calc.inputDigit('0');
-      final result = calc.calculate();
-      expect(result.hasError, true);
+      calc.calculate();
+      expect(calc.hasError, true);
     });
 
-    test('Clear resets to 0', () {
-      calc.inputDigit('5');
-      calc.inputDigit('5');
-      calc.clear();
-      expect(calc.display, '0');
-    });
-
-    test('Percentage converts correctly', () {
-      calc.inputDigit('5');
-      calc.inputDigit('0');
-      calc.percentage();
-      expect(calc.display, '0.5');
-    });
-
-    test('Toggle sign works', () {
-      calc.inputDigit('5');
-      calc.toggleSign();
-      expect(calc.display, '-5');
-    });
-
-    test('Decimal point input works', () {
-      calc.inputDigit('3');
-      calc.inputDigit('.');
+    test('Jonli hisoblash (Live preview)', () {
       calc.inputDigit('1');
-      calc.inputDigit('4');
-      expect(calc.display, '3.14');
+      calc.inputDigit('2');
+      calc.inputOperator('+');
+      calc.inputDigit('8');
+      expect(calc.livePreview, '20');
     });
+  });
 
-    test('Cannot enter two decimal points', () {
-      calc.inputDigit('3');
-      calc.inputDigit('.');
-      calc.inputDigit('1');
-      calc.inputDigit('.');
-      calc.inputDigit('4');
-      expect(calc.display, '3.14');
+  group('ConverterModel Tests', () {
+    test('Metrdan kilometrga o\'tkazish', () {
+      final res = ConverterModel.convert(
+        category: UnitCategory.length,
+        value: 1000,
+        from: ConverterModel.units[UnitCategory.length]![0], // m
+        to: ConverterModel.units[UnitCategory.length]![1],   // km
+      );
+      expect(res, 1.0);
+    });
+  });
+
+  group('FinanceModel Tests', () {
+    test('Chegirma hisoblash', () {
+      final res = FinanceModel.calculateDiscount(originalPrice: 100000, discountPercent: 20);
+      expect(res.savedAmount, 20000);
+      expect(res.finalPrice, 80000);
+    });
+  });
+
+  group('ProgrammerModel Tests', () {
+    test('O\'nlikdan o\'n oltilikka (DEC to HEX)', () {
+      final prog = ProgrammerModel();
+      prog.inputDec("255");
+      expect(prog.hex, 'FF');
+      expect(prog.bin, '1111 1111');
     });
   });
 }

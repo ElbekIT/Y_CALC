@@ -1,8 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/calculator_model.dart';
+import '../themes/app_theme.dart';
 import '../widgets/calc_button.dart';
 import '../widgets/display_panel.dart';
-import '../themes/app_theme.dart';
+import 'converter_view.dart';
+import 'finance_view.dart';
+import 'programmer_view.dart';
+import 'history_sheet.dart';
+
+enum AppMode {
+  calculator,
+  converter,
+  finance,
+  programmer,
+}
 
 class CalculatorScreen extends StatefulWidget {
   const CalculatorScreen({super.key});
@@ -13,226 +25,464 @@ class CalculatorScreen extends StatefulWidget {
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
   final CalculatorModel _calc = CalculatorModel();
-  String _display = '0';
-  String _history = '';
-  bool _hasError = false;
+  ThemeType _currentTheme = ThemeType.amoledDark;
+  AppMode _currentMode = AppMode.calculator;
+  bool _isScientificExpanded = false;
 
-  void _onButton(String label) {
+  AppPalette get _palette => AppTheme.palettes[_currentTheme]!;
+
+  void _onButtonPress(String label) {
     setState(() {
       switch (label) {
         case 'AC':
+        case 'C':
           _calc.clear();
-          _display = '0';
-          _history = '';
-          _hasError = false;
           break;
         case '⌫':
-          _calc.clearEntry();
-          _display = _calc.display;
-          _hasError = _calc.hasError;
+          _calc.backspace();
           break;
         case '+/-':
           _calc.toggleSign();
-          _display = _calc.display;
           break;
         case '%':
           _calc.percentage();
-          _display = _calc.display;
-          _hasError = _calc.hasError;
           break;
         case '=':
-          final result = _calc.calculate();
-          _display = result.display;
-          _history = result.history;
-          _hasError = result.hasError;
+          _calc.calculate();
           break;
         case '+':
         case '-':
         case '×':
         case '÷':
+        case '^':
           _calc.inputOperator(label);
-          _display = _calc.display;
-          _history = _calc.history;
-          _hasError = false;
+          break;
+        case 'sin':
+        case 'cos':
+        case 'tan':
+        case 'ln':
+        case 'log':
+        case '√':
+          _calc.inputFunction(label);
+          break;
+        case '(':
+        case ')':
+          _calc.inputParenthesis(label);
+          break;
+        case 'π':
+        case 'e':
+          _calc.inputConstant(label);
+          break;
+        case 'RAD':
+        case 'DEG':
+          _calc.toggleRadDeg();
+          break;
+        case 'x!':
+          _calc.inputDigit('!');
           break;
         default:
           _calc.inputDigit(label);
-          _display = _calc.display;
-          _history = _calc.history;
-          _hasError = _calc.hasError;
+          break;
       }
     });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final double buttonAreaHeight = size.height * 0.62;
-    final double buttonSize = (size.width - 5 * 14) / 4;
+  void _openHistory() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => HistorySheet(
+        history: _calc.history,
+        palette: _palette,
+        onSelect: (val) {
+          setState(() {
+            _calc.inputDigit(val);
+          });
+        },
+        onClear: () {
+          setState(() {
+            _calc.clearHistory();
+          });
+        },
+      ),
+    );
+  }
 
-    return Scaffold(
-      backgroundColor: AppColors.bgPrimary,
-      body: SafeArea(
+  void _openThemeSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _palette.bgSecondary,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
-            Expanded(
-              child: DisplayPanel(
-                display: _display,
-                history: _history,
-                hasError: _hasError,
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _palette.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-            _buildButtonGrid(buttonAreaHeight, buttonSize),
+            const SizedBox(height: 16),
+            Text(
+              "Mavzuni tanlang",
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: _palette.displayText,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...ThemeType.values.map((t) {
+              final pal = AppTheme.palettes[t]!;
+              final isSel = _currentTheme == t;
+              return ListTile(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                tileColor: isSel ? pal.accent.withOpacity(0.15) : null,
+                leading: Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: pal.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                title: Text(
+                  pal.name,
+                  style: TextStyle(
+                    color: _palette.displayText,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
+                trailing: isSel ? Icon(Icons.check, color: pal.accent) : null,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  setState(() => _currentTheme = t);
+                  Navigator.pop(context);
+                },
+              );
+            }),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildHeader() {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: _palette.bgPrimary,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildAppBar(),
+            Expanded(child: _buildCurrentModeContent()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [AppColors.accentPurple, AppColors.accentCyan],
-            ).createShader(bounds),
-            child: const Text(
-              'Y CALC',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: 4,
+          // Brand Title
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "Y CALC",
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 2,
+                  color: _palette.displayText,
+                ),
               ),
-            ),
+              Text(
+                _getModeTitle(_currentMode),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: _palette.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
           ),
+
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: AppColors.accentPurple.withOpacity(0.4),
+
+          // Scientific Toggle Button (faqat kalkulyator rejimida)
+          if (_currentMode == AppMode.calculator)
+            IconButton(
+              icon: Icon(
+                _isScientificExpanded ? Icons.functions : Icons.calculate_outlined,
+                color: _isScientificExpanded ? _palette.accent : _palette.displaySubText,
+                size: 22,
               ),
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.accentPurple.withOpacity(0.1),
-                  AppColors.accentCyan.withOpacity(0.1),
-                ],
-              ),
+              tooltip: "Ilmiy kalkulyator",
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                setState(() => _isScientificExpanded = !_isScientificExpanded);
+              },
             ),
-            child: const Text(
-              'DARK MODE',
-              style: TextStyle(
-                fontSize: 10,
-                color: AppColors.accentCyan,
-                letterSpacing: 1.5,
-              ),
-            ),
+
+          // History Button
+          IconButton(
+            icon: Icon(Icons.history, color: _palette.displaySubText, size: 22),
+            tooltip: "Tarix",
+            onPressed: _openHistory,
+          ),
+
+          // Theme Switcher Button
+          IconButton(
+            icon: Icon(Icons.palette_outlined, color: _palette.displaySubText, size: 22),
+            tooltip: "Mavzu",
+            onPressed: _openThemeSelector,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildButtonGrid(double buttonAreaHeight, double buttonSize) {
-    const gap = 14.0;
+  String _getModeTitle(AppMode mode) {
+    switch (mode) {
+      case AppMode.calculator:
+        return _isScientificExpanded ? "Ilmiy Muhandislik" : "Standart";
+      case AppMode.converter:
+        return "Birliklar O'tkazgich";
+      case AppMode.finance:
+        return "Moliya & Foydali";
+      case AppMode.programmer:
+        return "Dasturchi Rejimi";
+    }
+  }
 
+  Widget _buildCurrentModeContent() {
+    return Column(
+      children: [
+        // Mode Selector Bar (Pills)
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: _palette.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _palette.divider.withOpacity(0.3)),
+          ),
+          child: Row(
+            children: [
+              _buildModePill("Kalkulyator", AppMode.calculator, Icons.calculate),
+              _buildModePill("Birliklar", AppMode.converter, Icons.swap_horiz),
+              _buildModePill("Moliya", AppMode.finance, Icons.trending_up),
+              _buildModePill("Dasturchi", AppMode.programmer, Icons.code),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 4),
+
+        // Main View
+        Expanded(
+          child: _currentMode == AppMode.calculator
+              ? _buildCalculatorLayout()
+              : (_currentMode == AppMode.converter
+                  ? ConverterView(palette: _palette)
+                  : (_currentMode == AppMode.finance
+                      ? FinanceView(palette: _palette)
+                      : ProgrammerView(palette: _palette))),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildModePill(String title, AppMode mode, IconData icon) {
+    final isSel = _currentMode == mode;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          setState(() => _currentMode = mode);
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSel ? _palette.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: isSel ? Colors.white : _palette.displaySubText,
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
+                    color: isSel ? Colors.white : _palette.displaySubText,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalculatorLayout() {
+    return Column(
+      children: [
+        // Display Panel
+        Expanded(
+          flex: _isScientificExpanded ? 3 : 4,
+          child: DisplayPanel(
+            expression: _calc.expression,
+            display: _calc.display,
+            livePreview: _calc.livePreview,
+            lastFullExpression: _calc.lastFullExpression,
+            hasError: _calc.hasError,
+            palette: _palette,
+            onBackspace: () => _onButtonPress('⌫'),
+          ),
+        ),
+
+        // Scientific Expandable Panel
+        if (_isScientificExpanded)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            color: _palette.bgSecondary,
+            child: GridView.count(
+              shrinkWrap: true,
+              crossAxisCount: 5,
+              childAspectRatio: 2.0,
+              mainAxisSpacing: 6,
+              crossAxisSpacing: 6,
+              physics: const NeverScrollableScrollPhysics(),
+              children: [
+                _buildSciBtn(_calc.isRadians ? "RAD" : "DEG"),
+                _buildSciBtn("sin"),
+                _buildSciBtn("cos"),
+                _buildSciBtn("tan"),
+                _buildSciBtn("π"),
+                _buildSciBtn("ln"),
+                _buildSciBtn("log"),
+                _buildSciBtn("√"),
+                _buildSciBtn("^"),
+                _buildSciBtn("e"),
+                _buildSciBtn("("),
+                _buildSciBtn(")"),
+                _buildSciBtn("x!"),
+                _buildSciBtn("%"),
+                _buildSciBtn("⌫"),
+              ],
+            ),
+          ),
+
+        // Main Keypad Area
+        Expanded(
+          flex: _isScientificExpanded ? 5 : 6,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            decoration: BoxDecoration(
+              color: _palette.bgSecondary,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            ),
+            child: _buildMainKeypad(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSciBtn(String label) {
+    return CalcButton(
+      label: label,
+      variant: ButtonVariant.scientific,
+      palette: _palette,
+      fontSize: 13,
+      onPressed: () => _onButtonPress(label),
+    );
+  }
+
+  Widget _buildMainKeypad() {
     final List<List<Map<String, dynamic>>> rows = [
       [
-        {'label': 'AC', 'type': ButtonType.clear},
-        {'label': '+/-', 'type': ButtonType.special},
-        {'label': '%', 'type': ButtonType.special},
-        {'label': '÷', 'type': ButtonType.operator},
+        {'label': 'AC', 'variant': ButtonVariant.action},
+        {'label': '( )', 'variant': ButtonVariant.action, 'action': '('},
+        {'label': '%', 'variant': ButtonVariant.action},
+        {'label': '÷', 'variant': ButtonVariant.operator},
       ],
       [
-        {'label': '7', 'type': ButtonType.number},
-        {'label': '8', 'type': ButtonType.number},
-        {'label': '9', 'type': ButtonType.number},
-        {'label': '×', 'type': ButtonType.operator},
+        {'label': '7', 'variant': ButtonVariant.number},
+        {'label': '8', 'variant': ButtonVariant.number},
+        {'label': '9', 'variant': ButtonVariant.number},
+        {'label': '×', 'variant': ButtonVariant.operator},
       ],
       [
-        {'label': '4', 'type': ButtonType.number},
-        {'label': '5', 'type': ButtonType.number},
-        {'label': '6', 'type': ButtonType.number},
-        {'label': '-', 'type': ButtonType.operator},
+        {'label': '4', 'variant': ButtonVariant.number},
+        {'label': '5', 'variant': ButtonVariant.number},
+        {'label': '6', 'variant': ButtonVariant.number},
+        {'label': '-', 'variant': ButtonVariant.operator},
       ],
       [
-        {'label': '1', 'type': ButtonType.number},
-        {'label': '2', 'type': ButtonType.number},
-        {'label': '3', 'type': ButtonType.number},
-        {'label': '+', 'type': ButtonType.operator},
+        {'label': '1', 'variant': ButtonVariant.number},
+        {'label': '2', 'variant': ButtonVariant.number},
+        {'label': '3', 'variant': ButtonVariant.number},
+        {'label': '+', 'variant': ButtonVariant.operator},
       ],
       [
-        {'label': '⌫', 'type': ButtonType.special},
-        {'label': '0', 'type': ButtonType.number},
-        {'label': '.', 'type': ButtonType.number},
-        {'label': '=', 'type': ButtonType.equal},
+        {'label': '+/-', 'variant': ButtonVariant.number},
+        {'label': '0', 'variant': ButtonVariant.number},
+        {'label': '.', 'variant': ButtonVariant.number},
+        {'label': '=', 'variant': ButtonVariant.equal},
       ],
     ];
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      height: buttonAreaHeight,
-      decoration: BoxDecoration(
-        color: AppColors.bgSecondary,
-        borderRadius: const BorderRadius.only(
-          topLeft: Radius.circular(32),
-          topRight: Radius.circular(32),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accentPurple.withOpacity(0.1),
-            blurRadius: 30,
-            spreadRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // Drag indicator
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 14),
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Expanded(
-            child: Column(
-              children: rows.map((row) {
+    return Column(
+      children: rows.map((row) {
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: row.map((btn) {
                 return Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: row.asMap().entries.map((entry) {
-                        final item = entry.value;
-                        return Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              right: entry.key < row.length - 1 ? gap : 0,
-                            ),
-                            child: CalcButton(
-                              label: item['label'] as String,
-                              type: item['type'] as ButtonType,
-                              onPressed: () => _onButton(item['label'] as String),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: CalcButton(
+                      label: btn['label'] as String,
+                      variant: btn['variant'] as ButtonVariant,
+                      palette: _palette,
+                      onPressed: () => _onButtonPress(
+                        btn['action'] != null ? btn['action'] as String : btn['label'] as String,
+                      ),
                     ),
                   ),
                 );
               }).toList(),
             ),
           ),
-        ],
-      ),
+        );
+      }).toList(),
     );
   }
 }
