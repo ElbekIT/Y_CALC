@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:battery_plus/battery_plus.dart';
 import '../models/calculator_model.dart';
 import '../themes/app_theme.dart';
 import '../utils/audio_feedback.dart';
@@ -28,11 +30,16 @@ class CalculatorScreen extends StatefulWidget {
 
 class _CalculatorScreenState extends State<CalculatorScreen> {
   final CalculatorModel _calc = CalculatorModel();
+  final Battery _battery = Battery();
+  StreamSubscription<BatteryState>? _batterySubscription;
+
   ThemeType _currentTheme = ThemeType.amoledDark;
   AppMode _currentMode = AppMode.calculator;
   bool _isScientificExpanded = false;
   bool _isVoiceOn = true;
-  int _batteryPercent = 18; // 20% dan kam bo'lganda ogohlantirish uchun namuna
+
+  int _batteryPercent = 100;
+  bool _isCharging = false;
   bool _batteryWarningDismissed = false;
 
   AppPalette get _palette => AppTheme.palettes[_currentTheme]!;
@@ -41,6 +48,39 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   void initState() {
     super.initState();
     AudioFeedback.isVoiceEnabled = _isVoiceOn;
+    _initBattery();
+  }
+
+  @override
+  void dispose() {
+    _batterySubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _initBattery() async {
+    try {
+      final level = await _battery.batteryLevel;
+      if (mounted) {
+        setState(() {
+          _batteryPercent = level;
+        });
+      }
+
+      _batterySubscription = _battery.onBatteryStateChanged.listen((state) async {
+        final currentLevel = await _battery.batteryLevel;
+        if (mounted) {
+          setState(() {
+            _batteryPercent = currentLevel;
+            _isCharging = (state == BatteryState.charging || state == BatteryState.full);
+            if (currentLevel > 20) {
+              _batteryWarningDismissed = false;
+            }
+          });
+        }
+      });
+    } catch (_) {
+      // Emulator yoki datchik bo'lmasa xato bermaydi
+    }
   }
 
   void _onButtonPress(String label) {
@@ -116,6 +156,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       SnackBar(
         content: Text(_isVoiceOn ? "🔊 Ovozli rejim YOQILDI" : "🔇 Ovozli rejim O'CHIRILDI"),
         duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _palette.bgCard,
+      ),
+    );
+  }
+
+  void _showBatteryInfo() {
+    HapticFeedback.selectionClick();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("🔋 Batareya quvvati: $_batteryPercent% ${_isCharging ? '(Quvvatlanmoqda ⚡)' : ''}"),
+        duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         backgroundColor: _palette.bgCard,
       ),
@@ -259,7 +311,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Widget _buildBatteryWarningBanner() {
-    if (_batteryPercent > 20 || _batteryWarningDismissed) {
+    // Agar batareya 20% dan kam bo'lsa va zaryadga ulanmagan bo'lsa
+    if (_batteryPercent > 20 || _isCharging || _batteryWarningDismissed) {
       return const SizedBox.shrink();
     }
     return Container(
@@ -271,7 +324,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              "Zaryad $_batteryPercent%! Quvvatni tejash rejimi yoqildi.",
+              "Zaryad $_batteryPercent%! Quvvatni tejash uchun ekran yorug'ligi kamaytirildi.",
               style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
@@ -314,6 +367,43 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           ),
 
           const Spacer(),
+
+          // Real-time Battery Status Icon
+          GestureDetector(
+            onTap: _showBatteryInfo,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _palette.bgCard,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _batteryPercent <= 20 ? const Color(0xFFEF4444) : _palette.divider.withOpacity(0.4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isCharging
+                        ? Icons.battery_charging_full
+                        : (_batteryPercent <= 20 ? Icons.battery_alert : Icons.battery_std),
+                    size: 15,
+                    color: _batteryPercent <= 20 ? const Color(0xFFEF4444) : _palette.accent,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    "$_batteryPercent%",
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: _batteryPercent <= 20 ? const Color(0xFFEF4444) : _palette.displayText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 4),
 
           // Voice Toggle
           IconButton(
