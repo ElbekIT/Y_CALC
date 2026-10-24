@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/extra_tools_model.dart';
 import '../themes/app_theme.dart';
+import '../utils/app_localizations.dart';
+import '../utils/currency_service.dart';
 
-enum SmartToolType { market, fuel, gpa, currency, words, quiz }
+enum SmartToolType { currency, market, fuel, words, gpa, quiz }
 
 class SmartToolsView extends StatefulWidget {
   final AppPalette palette;
@@ -16,7 +18,14 @@ class SmartToolsView extends StatefulWidget {
 }
 
 class _SmartToolsViewState extends State<SmartToolsView> {
-  SmartToolType _selectedTool = SmartToolType.market;
+  SmartToolType _selectedTool = SmartToolType.currency;
+
+  // Valyuta kurslari (Real-time online + offline backup)
+  final _currAmountCtrl = TextEditingController(text: "100");
+  String _fromCurr = "USD";
+  String _toCurr = "UZS";
+  double _currResult = 0;
+  bool _isLoadingCurrency = false;
 
   // Bozor inputs
   final _marketPricePerKgCtrl = TextEditingController(text: "85000");
@@ -28,18 +37,6 @@ class _SmartToolsViewState extends State<SmartToolsView> {
   final _fuelConsumpCtrl = TextEditingController(text: "8.5");
   final _fuelPriceCtrl = TextEditingController(text: "12500");
   double _fuelTotalCost = 318750;
-
-  // Valyuta kurslari (offline bazaviy kurslar)
-  final _currAmountCtrl = TextEditingController(text: "100");
-  String _fromCurr = "USD";
-  String _toCurr = "UZS";
-  final Map<String, double> _ratesToUzs = {
-    "UZS": 1.0,
-    "USD": 12850.0,
-    "EUR": 13950.0,
-    "RUB": 135.0,
-  };
-  double _currResult = 1285000;
 
   // Raqamni so'zga aylantirish
   final _numWordsCtrl = TextEditingController(text: "1500000");
@@ -64,9 +61,9 @@ class _SmartToolsViewState extends State<SmartToolsView> {
   @override
   void initState() {
     super.initState();
+    _fetchLiveCurrency();
     _recalcMarket();
     _recalcFuel();
-    _recalcCurrency();
     _recalcWords();
     _recalcGpa();
   }
@@ -75,6 +72,27 @@ class _SmartToolsViewState extends State<SmartToolsView> {
   void dispose() {
     _quizTimer?.cancel();
     super.dispose();
+  }
+
+  Future<void> _fetchLiveCurrency() async {
+    setState(() => _isLoadingCurrency = true);
+    await CurrencyService.fetchLiveRates();
+    if (mounted) {
+      setState(() {
+        _isLoadingCurrency = false;
+        _recalcCurrency();
+      });
+    }
+  }
+
+  void _recalcCurrency() {
+    final amt = double.tryParse(_currAmountCtrl.text) ?? 0;
+    final rateFrom = CurrencyService.ratesToUzs[_fromCurr] ?? 1.0;
+    final rateTo = CurrencyService.ratesToUzs[_toCurr] ?? 1.0;
+    setState(() {
+      final inUzs = amt * rateFrom;
+      _currResult = inUzs / rateTo;
+    });
   }
 
   void _recalcMarket() {
@@ -91,16 +109,6 @@ class _SmartToolsViewState extends State<SmartToolsView> {
     final p = double.tryParse(_fuelPriceCtrl.text) ?? 0;
     setState(() {
       _fuelTotalCost = FuelCalc.calcTripCost(distanceKm: d, consumptionPer100Km: c, fuelPrice: p);
-    });
-  }
-
-  void _recalcCurrency() {
-    final amt = double.tryParse(_currAmountCtrl.text) ?? 0;
-    final rateFrom = _ratesToUzs[_fromCurr] ?? 1.0;
-    final rateTo = _ratesToUzs[_toCurr] ?? 1.0;
-    setState(() {
-      final inUzs = amt * rateFrom;
-      _currResult = inUzs / rateTo;
     });
   }
 
@@ -176,12 +184,12 @@ class _SmartToolsViewState extends State<SmartToolsView> {
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             children: [
-              _buildToolChip("Bozor & Savdo", SmartToolType.market, Icons.storefront),
-              _buildToolChip("Yoqilg'i & Yo'l", SmartToolType.fuel, Icons.local_gas_station),
-              _buildToolChip("Valyuta kursi", SmartToolType.currency, Icons.currency_exchange),
-              _buildToolChip("So'z bilan", SmartToolType.words, Icons.text_fields),
-              _buildToolChip("Talaba GPA", SmartToolType.gpa, Icons.school),
-              _buildToolChip("Aql charxi", SmartToolType.quiz, Icons.sports_esports),
+              _buildToolChip(AppStrings.tr('currencyRates'), SmartToolType.currency, Icons.currency_exchange),
+              _buildToolChip(AppStrings.tr('marketTrade'), SmartToolType.market, Icons.storefront),
+              _buildToolChip(AppStrings.tr('fuelTrip'), SmartToolType.fuel, Icons.local_gas_station),
+              _buildToolChip(AppStrings.tr('inWords'), SmartToolType.words, Icons.text_fields),
+              _buildToolChip(AppStrings.tr('studentGpa'), SmartToolType.gpa, Icons.school),
+              _buildToolChip(AppStrings.tr('brainQuiz'), SmartToolType.quiz, Icons.sports_esports),
             ],
           ),
         ),
@@ -224,12 +232,12 @@ class _SmartToolsViewState extends State<SmartToolsView> {
 
   Widget _buildToolBody() {
     switch (_selectedTool) {
+      case SmartToolType.currency:
+        return _buildCurrencySection();
       case SmartToolType.market:
         return _buildMarketSection();
       case SmartToolType.fuel:
         return _buildFuelSection();
-      case SmartToolType.currency:
-        return _buildCurrencySection();
       case SmartToolType.words:
         return _buildWordsSection();
       case SmartToolType.gpa:
@@ -239,46 +247,26 @@ class _SmartToolsViewState extends State<SmartToolsView> {
     }
   }
 
-  // 1. BOZOR
-  Widget _buildMarketSection() {
-    return Column(
-      children: [
-        _buildInputRow("1 kg narxi (so'm)", _marketPricePerKgCtrl, _recalcMarket),
-        const SizedBox(height: 10),
-        _buildInputRow("Og'irlik (gramm)", _marketGramsCtrl, _recalcMarket),
-        const SizedBox(height: 16),
-        _buildResultCard(
-          "To'lanadigan summa",
-          "${_formatNumber(_marketWeightResult)} so'm",
-          sub: "${_marketGramsCtrl.text} gr uchun",
-        ),
-      ],
-    );
-  }
-
-  // 2. FUEL
-  Widget _buildFuelSection() {
-    return Column(
-      children: [
-        _buildInputRow("Masofa (km)", _fuelDistanceCtrl, _recalcFuel),
-        const SizedBox(height: 10),
-        _buildInputRow("100 km sarfi (litr / kub)", _fuelConsumpCtrl, _recalcFuel),
-        const SizedBox(height: 10),
-        _buildInputRow("Yoqilg'i narxi (1 litr/kub so'm)", _fuelPriceCtrl, _recalcFuel),
-        const SizedBox(height: 16),
-        _buildResultCard(
-          "Yo'l uchun jami xarajat",
-          "${_formatNumber(_fuelTotalCost)} so'm",
-          sub: "${((double.tryParse(_fuelDistanceCtrl.text) ?? 0) / 100 * (double.tryParse(_fuelConsumpCtrl.text) ?? 0)).toStringAsFixed(1)} litr yoqilg'i ketadi",
-        ),
-      ],
-    );
-  }
-
-  // 3. CURRENCY
+  // 1. REAL-TIME CURRENCY
   Widget _buildCurrencySection() {
     return Column(
       children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              CurrencyService.lastUpdated,
+              style: TextStyle(fontSize: 12, color: widget.palette.accent, fontWeight: FontWeight.bold),
+            ),
+            IconButton(
+              icon: _isLoadingCurrency
+                  ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: widget.palette.accent))
+                  : Icon(Icons.refresh, size: 18, color: widget.palette.accent),
+              tooltip: "Yangilash",
+              onPressed: _isLoadingCurrency ? null : _fetchLiveCurrency,
+            ),
+          ],
+        ),
         _buildInputRow("Summa", _currAmountCtrl, _recalcCurrency),
         const SizedBox(height: 10),
         Container(
@@ -296,7 +284,7 @@ class _SmartToolsViewState extends State<SmartToolsView> {
                 dropdownColor: widget.palette.bgSecondary,
                 underline: const SizedBox(),
                 style: TextStyle(color: widget.palette.displayText, fontWeight: FontWeight.bold),
-                items: ["USD", "EUR", "RUB", "UZS"].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                items: CurrencyService.ratesToUzs.keys.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (v) {
                   if (v != null) {
                     setState(() => _fromCurr = v);
@@ -310,7 +298,7 @@ class _SmartToolsViewState extends State<SmartToolsView> {
                 dropdownColor: widget.palette.bgSecondary,
                 underline: const SizedBox(),
                 style: TextStyle(color: widget.palette.displayText, fontWeight: FontWeight.bold),
-                items: ["UZS", "USD", "EUR", "RUB"].map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+                items: CurrencyService.ratesToUzs.keys.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (v) {
                   if (v != null) {
                     setState(() => _toCurr = v);
@@ -325,7 +313,43 @@ class _SmartToolsViewState extends State<SmartToolsView> {
         _buildResultCard(
           "O'tkazma natijasi",
           "${_formatNumber(_currResult)} $_toCurr",
-          sub: "1 USD = 12 850 UZS (Offline hisob)",
+          sub: "1 USD = ${_formatNumber(CurrencyService.ratesToUzs['USD'] ?? 12850)} UZS",
+        ),
+      ],
+    );
+  }
+
+  // 2. BOZOR
+  Widget _buildMarketSection() {
+    return Column(
+      children: [
+        _buildInputRow("1 kg narxi (so'm)", _marketPricePerKgCtrl, _recalcMarket),
+        const SizedBox(height: 10),
+        _buildInputRow("Og'irlik (gramm)", _marketGramsCtrl, _recalcMarket),
+        const SizedBox(height: 16),
+        _buildResultCard(
+          "To'lanadigan summa",
+          "${_formatNumber(_marketWeightResult)} so'm",
+          sub: "${_marketGramsCtrl.text} gr uchun",
+        ),
+      ],
+    );
+  }
+
+  // 3. FUEL
+  Widget _buildFuelSection() {
+    return Column(
+      children: [
+        _buildInputRow("Masofa (km)", _fuelDistanceCtrl, _recalcFuel),
+        const SizedBox(height: 10),
+        _buildInputRow("100 km sarfi (litr / kub)", _fuelConsumpCtrl, _recalcFuel),
+        const SizedBox(height: 10),
+        _buildInputRow("Yoqilg'i narxi (1 litr/kub so'm)", _fuelPriceCtrl, _recalcFuel),
+        const SizedBox(height: 16),
+        _buildResultCard(
+          "Yo'l uchun jami xarajat",
+          "${_formatNumber(_fuelTotalCost)} so'm",
+          sub: "${((double.tryParse(_fuelDistanceCtrl.text) ?? 0) / 100 * (double.tryParse(_fuelConsumpCtrl.text) ?? 0)).toStringAsFixed(1)} litr yoqilg'i ketadi",
         ),
       ],
     );
@@ -404,7 +428,7 @@ class _SmartToolsViewState extends State<SmartToolsView> {
     );
   }
 
-  // 6. QUIZ (Aql charxi)
+  // 6. QUIZ
   Widget _buildQuizSection() {
     return Column(
       children: [

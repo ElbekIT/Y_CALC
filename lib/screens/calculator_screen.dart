@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../models/calculator_model.dart';
 import '../themes/app_theme.dart';
+import '../utils/app_localizations.dart';
 import '../utils/audio_feedback.dart';
 import '../widgets/calc_button.dart';
 import '../widgets/display_panel.dart';
@@ -78,9 +79,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           });
         }
       });
-    } catch (_) {
-      // Emulator yoki datchik bo'lmasa xato bermaydi
-    }
+    } catch (_) {}
   }
 
   void _onButtonPress(String label) {
@@ -154,7 +153,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     HapticFeedback.lightImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(_isVoiceOn ? "🔊 Ovozli rejim YOQILDI" : "🔇 Ovozli rejim O'CHIRILDI"),
+        content: Text(_isVoiceOn ? AppStrings.tr('voiceOn') : AppStrings.tr('voiceOff')),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
         backgroundColor: _palette.bgCard,
@@ -166,7 +165,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     HapticFeedback.selectionClick();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text("🔋 Batareya quvvati: $_batteryPercent% ${_isCharging ? '(Quvvatlanmoqda ⚡)' : ''}"),
+        content: Text("🔋 Batareya: $_batteryPercent% ${_isCharging ? '⚡' : ''}"),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         backgroundColor: _palette.bgCard,
@@ -196,10 +195,64 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     HapticFeedback.mediumImpact();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text("Chek nusxalandi! Telegramga yuborishingiz mumkin."),
+        content: Text(AppStrings.tr('receiptCopied')),
         behavior: SnackBarBehavior.floating,
         backgroundColor: _palette.accent,
       ),
+    );
+  }
+
+  void _openLanguageSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _palette.bgSecondary,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: _palette.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              "Tilni tanlang / Выберите язык / Select Language",
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _palette.displayText),
+            ),
+            const SizedBox(height: 16),
+            _buildLangTile("🇺🇿 O'zbekcha", AppLanguage.uz),
+            _buildLangTile("🇷🇺 Русский", AppLanguage.ru),
+            _buildLangTile("🇬🇧 English", AppLanguage.en),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLangTile(String title, AppLanguage lang) {
+    final isSel = AppStrings.currentLang == lang;
+    return ListTile(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      tileColor: isSel ? _palette.accent.withOpacity(0.15) : null,
+      title: Text(title, style: TextStyle(color: _palette.displayText, fontWeight: isSel ? FontWeight.bold : FontWeight.normal)),
+      trailing: isSel ? Icon(Icons.check, color: _palette.accent) : null,
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => AppStrings.currentLang = lang);
+        Navigator.pop(context);
+      },
     );
   }
 
@@ -251,7 +304,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             const SizedBox(height: 16),
             Text(
-              "Mavzuni tanlang",
+              AppStrings.tr('theme'),
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -311,7 +364,6 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Widget _buildBatteryWarningBanner() {
-    // Agar batareya 20% dan kam bo'lsa va zaryadga ulanmagan bo'lsa
     if (_batteryPercent > 20 || _isCharging || _batteryWarningDismissed) {
       return const SizedBox.shrink();
     }
@@ -324,7 +376,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              "Zaryad $_batteryPercent%! Quvvatni tejash uchun ekran yorug'ligi kamaytirildi.",
+              "Zaryad $_batteryPercent%! ${AppStrings.tr('batteryWarn')}",
               style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
@@ -367,6 +419,25 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           ),
 
           const Spacer(),
+
+          // Language Selector Button (UZ / RU / EN)
+          GestureDetector(
+            onTap: _openLanguageSelector,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _palette.bgCard,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _palette.divider.withOpacity(0.4)),
+              ),
+              child: Text(
+                AppStrings.currentLang == AppLanguage.uz ? "UZ" : (AppStrings.currentLang == AppLanguage.ru ? "RU" : "EN"),
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _palette.accent),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 6),
 
           // Real-time Battery Status Icon
           GestureDetector(
@@ -459,15 +530,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   String _getModeTitle(AppMode mode) {
     switch (mode) {
       case AppMode.calculator:
-        return _isScientificExpanded ? "Ilmiy Muhandislik" : "Standart";
+        return _isScientificExpanded ? AppStrings.tr('scientific') : AppStrings.tr('standard');
       case AppMode.converter:
-        return "Birliklar O'tkazgich";
+        return AppStrings.tr('converter');
       case AppMode.finance:
-        return "Moliya & Foydali";
+        return AppStrings.tr('finance');
       case AppMode.smartTools:
-        return "Aqlli Vositalar";
+        return AppStrings.tr('smartTools');
       case AppMode.programmer:
-        return "Dasturchi Rejimi";
+        return AppStrings.tr('programmer');
     }
   }
 
@@ -487,11 +558,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildModePill("Kalkulyator", AppMode.calculator, Icons.calculate),
-                _buildModePill("Aqlli Vositalar", AppMode.smartTools, Icons.auto_awesome),
-                _buildModePill("Birliklar", AppMode.converter, Icons.swap_horiz),
-                _buildModePill("Moliya", AppMode.finance, Icons.trending_up),
-                _buildModePill("Dasturchi", AppMode.programmer, Icons.code),
+                _buildModePill(AppStrings.tr('calculator'), AppMode.calculator, Icons.calculate),
+                _buildModePill(AppStrings.tr('smartTools'), AppMode.smartTools, Icons.auto_awesome),
+                _buildModePill(AppStrings.tr('converter'), AppMode.converter, Icons.swap_horiz),
+                _buildModePill(AppStrings.tr('finance'), AppMode.finance, Icons.trending_up),
+                _buildModePill(AppStrings.tr('programmer'), AppMode.programmer, Icons.code),
               ],
             ),
           ),
@@ -499,17 +570,20 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
         const SizedBox(height: 4),
 
-        // Main View
+        // Main View with Animated Transition
         Expanded(
-          child: _currentMode == AppMode.calculator
-              ? _buildCalculatorLayout()
-              : (_currentMode == AppMode.smartTools
-                  ? SmartToolsView(palette: _palette)
-                  : (_currentMode == AppMode.converter
-                      ? ConverterView(palette: _palette)
-                      : (_currentMode == AppMode.finance
-                          ? FinanceView(palette: _palette)
-                          : ProgrammerView(palette: _palette)))),
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 150),
+            child: _currentMode == AppMode.calculator
+                ? _buildCalculatorLayout()
+                : (_currentMode == AppMode.smartTools
+                    ? SmartToolsView(key: const ValueKey('smartTools'), palette: _palette)
+                    : (_currentMode == AppMode.converter
+                        ? ConverterView(key: const ValueKey('converter'), palette: _palette)
+                        : (_currentMode == AppMode.finance
+                            ? FinanceView(key: const ValueKey('finance'), palette: _palette)
+                            : ProgrammerView(key: const ValueKey('programmer'), palette: _palette)))),
+          ),
         ),
       ],
     );
@@ -522,7 +596,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         HapticFeedback.selectionClick();
         setState(() => _currentMode = mode);
       },
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
         margin: const EdgeInsets.only(right: 4),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
@@ -549,6 +624,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   Widget _buildCalculatorLayout() {
     return Column(
+      key: const ValueKey('calculatorLayout'),
       children: [
         // Display Panel
         Expanded(

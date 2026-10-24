@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:math_expressions/math_expressions.dart';
 
 class HistoryItem {
   final String expression;
@@ -23,6 +24,8 @@ class CalculatorModel {
   double _memory = 0.0;
 
   final List<HistoryItem> _history = [];
+  final Parser _parser = Parser();
+  final ContextModel _cm = ContextModel();
 
   // Getters
   String get display => _display;
@@ -39,26 +42,22 @@ class CalculatorModel {
     _updateLivePreview();
   }
 
-  void memoryClear() {
-    _memory = 0.0;
-  }
+  void memoryClear() => _memory = 0.0;
 
   void memoryStore() {
-    final val = double.tryParse(_display.replaceAll(',', ''));
+    final val = double.tryParse(_display.replaceAll(RegExp(r'[^0-9.-]'), ''));
     if (val != null) _memory = val;
   }
 
-  void memoryRecall() {
-    inputDigit(_formatNumber(_memory));
-  }
+  void memoryRecall() => inputDigit(_formatNumber(_memory));
 
   void memoryAdd() {
-    final val = double.tryParse(_display.replaceAll(',', ''));
+    final val = double.tryParse(_display.replaceAll(RegExp(r'[^0-9.-]'), ''));
     if (val != null) _memory += val;
   }
 
   void memorySubtract() {
-    final val = double.tryParse(_display.replaceAll(',', ''));
+    final val = double.tryParse(_display.replaceAll(RegExp(r'[^0-9.-]'), ''));
     if (val != null) _memory -= val;
   }
 
@@ -99,7 +98,6 @@ class CalculatorModel {
     if (_expression.isEmpty) {
       _expression = _display + op;
     } else if (_isOperator(_expression[_expression.length - 1])) {
-      // Oxirgi operatorni almashtirish
       _expression = _expression.substring(0, _expression.length - 1) + op;
     } else {
       _expression += op;
@@ -161,14 +159,12 @@ class CalculatorModel {
     _hasError = false;
   }
 
-  void clearHistory() {
-    _history.clear();
-  }
+  void clearHistory() => _history.clear();
 
   void toggleSign() {
     if (_display == '0' || _hasError) return;
     try {
-      final double val = double.parse(_display.replaceAll(',', ''));
+      final double val = double.parse(_display.replaceAll(RegExp(r'[^0-9.-]'), ''));
       _display = _formatNumber(-val);
       _expression = _display;
       _updateLivePreview();
@@ -178,7 +174,7 @@ class CalculatorModel {
   void percentage() {
     if (_hasError) return;
     try {
-      final double val = double.parse(_display.replaceAll(',', ''));
+      final double val = double.parse(_display.replaceAll(RegExp(r'[^0-9.-]'), ''));
       final double res = val / 100.0;
       _display = _formatNumber(res);
       _expression = _display;
@@ -196,7 +192,7 @@ class CalculatorModel {
       final double res = _evaluateExpression(_expression);
       if (res.isNaN || res.isInfinite) {
         _hasError = true;
-        _display = res.isInfinite ? "0 ga bo'lib bo'lmaydi" : "Xato";
+        _display = res.isInfinite ? "0 ga bo'linmaydi" : "Xato";
         _livePreview = '';
         return;
       }
@@ -228,7 +224,6 @@ class CalculatorModel {
     }
 
     try {
-      // Yopilmagan qavslarni vaqtincha yopib sinash
       String testExpr = _expression;
       int openParen = '('.allMatches(testExpr).length;
       int closeParen = ')'.allMatches(testExpr).length;
@@ -251,6 +246,29 @@ class CalculatorModel {
     }
   }
 
+  double _evaluateExpression(String raw) {
+    String clean = raw
+        .replaceAll('×', '*')
+        .replaceAll('÷', '/')
+        .replaceAll('π', '${math.pi}')
+        .replaceAll('e', '${math.e}');
+
+    // Trigonometriyani DEG bo'lsa radian ga o'tkazish
+    if (!_isRadians) {
+      clean = clean.replaceAllMapped(RegExp(r'(sin|cos|tan)\(([^)]+)\)'), (m) {
+        final fn = m.group(1);
+        final arg = m.group(2);
+        return '$fn(($arg) * ${math.pi / 180.0})';
+      });
+    }
+
+    // sqrt belgisi
+    clean = clean.replaceAll('√', 'sqrt');
+
+    Expression exp = _parser.parse(clean);
+    return exp.evaluate(EvaluationType.REAL, _cm);
+  }
+
   bool _hasAnyOperator(String s) {
     return s.contains('+') || s.contains('-') || s.contains('×') || 
            s.contains('÷') || s.contains('^') || s.contains('%') ||
@@ -267,164 +285,9 @@ class CalculatorModel {
     return parts.isNotEmpty ? parts.last : '';
   }
 
-  double _evaluateExpression(String expr) {
-    String clean = expr.replaceAll('×', '*').replaceAll('÷', '/');
-    return _parseAddSub(clean, [0]);
-  }
-
-  double _parseAddSub(String s, List<int> pos) {
-    double left = _parseMulDiv(s, pos);
-    while (pos[0] < s.length) {
-      _skipSpaces(s, pos);
-      if (pos[0] >= s.length) break;
-      final char = s[pos[0]];
-      if (char == '+') {
-        pos[0]++;
-        left += _parseMulDiv(s, pos);
-      } else if (char == '-') {
-        pos[0]++;
-        left -= _parseMulDiv(s, pos);
-      } else {
-        break;
-      }
-    }
-    return left;
-  }
-
-  double _parseMulDiv(String s, List<int> pos) {
-    double left = _parsePower(s, pos);
-    while (pos[0] < s.length) {
-      _skipSpaces(s, pos);
-      if (pos[0] >= s.length) break;
-      final char = s[pos[0]];
-      if (char == '*') {
-        pos[0]++;
-        left *= _parsePower(s, pos);
-      } else if (char == '/') {
-        pos[0]++;
-        double denom = _parsePower(s, pos);
-        if (denom == 0) throw Exception("Division by zero");
-        left /= denom;
-      } else {
-        break;
-      }
-    }
-    return left;
-  }
-
-  double _parsePower(String s, List<int> pos) {
-    double base = _parseUnary(s, pos);
-    while (pos[0] < s.length) {
-      _skipSpaces(s, pos);
-      if (pos[0] >= s.length) break;
-      if (s[pos[0]] == '^') {
-        pos[0]++;
-        double exp = _parseUnary(s, pos);
-        base = math.pow(base, exp).toDouble();
-      } else {
-        break;
-      }
-    }
-    return base;
-  }
-
-  double _parseUnary(String s, List<int> pos) {
-    _skipSpaces(s, pos);
-    if (pos[0] >= s.length) return 0.0;
-
-    if (s[pos[0]] == '+') {
-      pos[0]++;
-      return _parseUnary(s, pos);
-    }
-    if (s[pos[0]] == '-') {
-      pos[0]++;
-      return -_parseUnary(s, pos);
-    }
-
-    // Funksiyalarni tekshirish: sin, cos, tan, ln, log, √
-    if (s.startsWith('sin', pos[0])) {
-      pos[0] += 3;
-      double arg = _parseUnary(s, pos);
-      return math.sin(_isRadians ? arg : arg * math.pi / 180.0);
-    }
-    if (s.startsWith('cos', pos[0])) {
-      pos[0] += 3;
-      double arg = _parseUnary(s, pos);
-      return math.cos(_isRadians ? arg : arg * math.pi / 180.0);
-    }
-    if (s.startsWith('tan', pos[0])) {
-      pos[0] += 3;
-      double arg = _parseUnary(s, pos);
-      return math.tan(_isRadians ? arg : arg * math.pi / 180.0);
-    }
-    if (s.startsWith('ln', pos[0])) {
-      pos[0] += 2;
-      double arg = _parseUnary(s, pos);
-      return math.log(arg);
-    }
-    if (s.startsWith('log', pos[0])) {
-      pos[0] += 3;
-      double arg = _parseUnary(s, pos);
-      return math.log(arg) / math.ln10;
-    }
-    if (s.startsWith('√', pos[0])) {
-      pos[0] += 1;
-      double arg = _parseUnary(s, pos);
-      return math.sqrt(arg);
-    }
-
-    return _parsePrimary(s, pos);
-  }
-
-  double _parsePrimary(String s, List<int> pos) {
-    _skipSpaces(s, pos);
-    if (pos[0] >= s.length) return 0.0;
-
-    if (s[pos[0]] == '(') {
-      pos[0]++;
-      double val = _parseAddSub(s, pos);
-      _skipSpaces(s, pos);
-      if (pos[0] < s.length && s[pos[0]] == ')') pos[0]++;
-      return val;
-    }
-
-    int start = pos[0];
-    while (pos[0] < s.length && RegExp(r'[0-9.]').hasMatch(s[pos[0]])) {
-      pos[0]++;
-    }
-
-    if (start == pos[0]) return 0.0;
-    double val = double.parse(s.substring(start, pos[0]));
-
-    // Factorial postfix '!'
-    _skipSpaces(s, pos);
-    if (pos[0] < s.length && s[pos[0]] == '!') {
-      pos[0]++;
-      val = _factorial(val.toInt()).toDouble();
-    }
-
-    return val;
-  }
-
-  int _factorial(int n) {
-    if (n < 0) return 0;
-    if (n <= 1) return 1;
-    int res = 1;
-    for (int i = 2; i <= n && i <= 20; i++) {
-      res *= i;
-    }
-    return res;
-  }
-
-  void _skipSpaces(String s, List<int> pos) {
-    while (pos[0] < s.length && s[pos[0]] == ' ') {
-      pos[0]++;
-    }
-  }
-
   String _formatNumber(double val) {
     if (val.isNaN) return 'Xato';
-    if (val.isInfinite) return "0 ga bo'lib bo'lmaydi";
+    if (val.isInfinite) return "0 ga bo'linmaydi";
 
     if (val == val.truncateToDouble() && val.abs() < 1e12) {
       return _formatWithCommas(val.toInt().toString());
