@@ -1,4 +1,4 @@
-package com.ycalc.app
+package com.algorix.app
 
 import io.flutter.embedding.android.FlutterActivity
 
