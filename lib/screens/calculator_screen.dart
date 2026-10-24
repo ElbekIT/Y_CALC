@@ -2,17 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/calculator_model.dart';
 import '../themes/app_theme.dart';
+import '../utils/audio_feedback.dart';
 import '../widgets/calc_button.dart';
 import '../widgets/display_panel.dart';
 import 'converter_view.dart';
 import 'finance_view.dart';
 import 'programmer_view.dart';
+import 'smart_tools_view.dart';
 import 'history_sheet.dart';
 
 enum AppMode {
   calculator,
   converter,
   finance,
+  smartTools,
   programmer,
 }
 
@@ -28,10 +31,21 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   ThemeType _currentTheme = ThemeType.amoledDark;
   AppMode _currentMode = AppMode.calculator;
   bool _isScientificExpanded = false;
+  bool _isVoiceOn = true;
+  int _batteryPercent = 18; // 20% dan kam bo'lganda ogohlantirish uchun namuna
+  bool _batteryWarningDismissed = false;
 
   AppPalette get _palette => AppTheme.palettes[_currentTheme]!;
 
+  @override
+  void initState() {
+    super.initState();
+    AudioFeedback.isVoiceEnabled = _isVoiceOn;
+  }
+
   void _onButtonPress(String label) {
+    AudioFeedback.playTap(label);
+
     setState(() {
       switch (label) {
         case 'AC':
@@ -49,6 +63,11 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           break;
         case '=':
           _calc.calculate();
+          if (_calc.hasError) {
+            AudioFeedback.playError();
+          } else {
+            AudioFeedback.playResult();
+          }
           break;
         case '+':
         case '-':
@@ -85,6 +104,51 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           break;
       }
     });
+  }
+
+  void _toggleVoice() {
+    setState(() {
+      _isVoiceOn = !_isVoiceOn;
+      AudioFeedback.isVoiceEnabled = _isVoiceOn;
+    });
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_isVoiceOn ? "🔊 Ovozli rejim YOQILDI" : "🔇 Ovozli rejim O'CHIRILDI"),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _palette.bgCard,
+      ),
+    );
+  }
+
+  void _shareReceiptToTelegram() {
+    if (_calc.history.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Hisoblar tarixi bo'sh"), duration: Duration(seconds: 1)),
+      );
+      return;
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln("🧾 *Y CALC HISOB CHEKI*");
+    buffer.writeln("📅 Sana: ${DateTime.now().day}.${DateTime.now().month}.${DateTime.now().year}");
+    buffer.writeln("--------------------------");
+    for (var item in _calc.history) {
+      buffer.writeln("${item.expression} = *${item.result}*");
+    }
+    buffer.writeln("--------------------------");
+    buffer.writeln("🚀 Y Calc ilovasi orqali hisoblandi");
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text("Chek nusxalandi! Telegramga yuborishingiz mumkin."),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: _palette.accent,
+      ),
+    );
   }
 
   void _openHistory() {
@@ -185,6 +249,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            _buildBatteryWarningBanner(),
             _buildAppBar(),
             Expanded(child: _buildCurrentModeContent()),
           ],
@@ -193,9 +258,35 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
+  Widget _buildBatteryWarningBanner() {
+    if (_batteryPercent > 20 || _batteryWarningDismissed) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      color: const Color(0xFFEF4444).withOpacity(0.9),
+      child: Row(
+        children: [
+          const Icon(Icons.battery_alert, color: Colors.white, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              "Zaryad $_batteryPercent%! Quvvatni tejash rejimi yoqildi.",
+              style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => setState(() => _batteryWarningDismissed = true),
+            child: const Icon(Icons.close, color: Colors.white, size: 16),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAppBar() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
           // Brand Title
@@ -224,7 +315,25 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
           const Spacer(),
 
-          // Scientific Toggle Button (faqat kalkulyator rejimida)
+          // Voice Toggle
+          IconButton(
+            icon: Icon(
+              _isVoiceOn ? Icons.volume_up : Icons.volume_off,
+              color: _isVoiceOn ? _palette.accent : _palette.displaySubText,
+              size: 22,
+            ),
+            tooltip: "Ovozli rejim",
+            onPressed: _toggleVoice,
+          ),
+
+          // Telegram Receipt Share
+          IconButton(
+            icon: Icon(Icons.receipt_long, color: _palette.displaySubText, size: 22),
+            tooltip: "Chek nusxalash",
+            onPressed: _shareReceiptToTelegram,
+          ),
+
+          // Scientific Toggle
           if (_currentMode == AppMode.calculator)
             IconButton(
               icon: Icon(
@@ -239,14 +348,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               },
             ),
 
-          // History Button
+          // History
           IconButton(
             icon: Icon(Icons.history, color: _palette.displaySubText, size: 22),
             tooltip: "Tarix",
             onPressed: _openHistory,
           ),
 
-          // Theme Switcher Button
+          // Theme Switcher
           IconButton(
             icon: Icon(Icons.palette_outlined, color: _palette.displaySubText, size: 22),
             tooltip: "Mavzu",
@@ -265,6 +374,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         return "Birliklar O'tkazgich";
       case AppMode.finance:
         return "Moliya & Foydali";
+      case AppMode.smartTools:
+        return "Aqlli Vositalar";
       case AppMode.programmer:
         return "Dasturchi Rejimi";
     }
@@ -282,13 +393,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: _palette.divider.withOpacity(0.3)),
           ),
-          child: Row(
-            children: [
-              _buildModePill("Kalkulyator", AppMode.calculator, Icons.calculate),
-              _buildModePill("Birliklar", AppMode.converter, Icons.swap_horiz),
-              _buildModePill("Moliya", AppMode.finance, Icons.trending_up),
-              _buildModePill("Dasturchi", AppMode.programmer, Icons.code),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildModePill("Kalkulyator", AppMode.calculator, Icons.calculate),
+                _buildModePill("Aqlli Vositalar", AppMode.smartTools, Icons.auto_awesome),
+                _buildModePill("Birliklar", AppMode.converter, Icons.swap_horiz),
+                _buildModePill("Moliya", AppMode.finance, Icons.trending_up),
+                _buildModePill("Dasturchi", AppMode.programmer, Icons.code),
+              ],
+            ),
           ),
         ),
 
@@ -298,11 +413,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         Expanded(
           child: _currentMode == AppMode.calculator
               ? _buildCalculatorLayout()
-              : (_currentMode == AppMode.converter
-                  ? ConverterView(palette: _palette)
-                  : (_currentMode == AppMode.finance
-                      ? FinanceView(palette: _palette)
-                      : ProgrammerView(palette: _palette))),
+              : (_currentMode == AppMode.smartTools
+                  ? SmartToolsView(palette: _palette)
+                  : (_currentMode == AppMode.converter
+                      ? ConverterView(palette: _palette)
+                      : (_currentMode == AppMode.finance
+                          ? FinanceView(palette: _palette)
+                          : ProgrammerView(palette: _palette)))),
         ),
       ],
     );
@@ -310,40 +427,31 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   Widget _buildModePill(String title, AppMode mode, IconData icon) {
     final isSel = _currentMode == mode;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          setState(() => _currentMode = mode);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSel ? _palette.accent : Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 15,
+    return GestureDetector(
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _currentMode = mode);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(right: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSel ? _palette.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: 15, color: isSel ? Colors.white : _palette.displaySubText),
+            const SizedBox(width: 4),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
                 color: isSel ? Colors.white : _palette.displaySubText,
               ),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: isSel ? FontWeight.bold : FontWeight.w500,
-                    color: isSel ? Colors.white : _palette.displaySubText,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
