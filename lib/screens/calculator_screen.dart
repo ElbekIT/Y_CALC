@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:in_app_update/in_app_update.dart';
 import '../models/calculator_model.dart';
 import '../themes/app_theme.dart';
 import '../utils/app_localizations.dart';
@@ -50,12 +51,27 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     super.initState();
     AudioFeedback.isVoiceEnabled = _isVoiceOn;
     _initBattery();
+    _checkForPlayStoreUpdate();
   }
 
   @override
   void dispose() {
     _batterySubscription?.cancel();
     super.dispose();
+  }
+
+  // Google Play In-App Update tekshiruvchisi
+  Future<void> _checkForPlayStoreUpdate() async {
+    try {
+      final updateInfo = await InAppUpdate.checkForUpdate();
+      if (updateInfo.updateAvailability == UpdateAvailability.updateAvailable) {
+        // Agar yangi versiya chiqsa, ekranda avtomatik yangilash oynasi chiqadi
+        await InAppUpdate.startFlexibleUpdate();
+        await InAppUpdate.completeFlexibleUpdate();
+      }
+    } catch (_) {
+      // Test rejimida yoki Play Store dan yuklanmagan bo'lsa xato bermaydi
+    }
   }
 
   Future<void> _initBattery() async {

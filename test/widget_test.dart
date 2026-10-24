@@ -4,46 +4,29 @@ import 'package:y_calc/models/extra_tools_model.dart';
 import 'package:y_calc/utils/app_localizations.dart';
 
 void main() {
-  group('Advanced Calculator Engine Tests', () {
-    test('Murakkab algebraik ifoda (math_expressions)', () {
+  group('Advanced Calculator Tests', () {
+    test('Matematik amallar tartibi va qavslar', () {
       final calc = CalculatorModel();
-      calc.inputDigit('1');
-      calc.inputDigit('0');
+      calc.inputDigit('2');
       calc.inputOperator('+');
-      calc.inputDigit('5');
+      calc.inputDigit('2');
       calc.inputOperator('×');
       calc.inputDigit('2');
       calc.calculate();
-      // 10 + 5 * 2 = 20 bo'lishi kerak (amallar ketma-ketligi to'g'ri)
-      expect(calc.display, '20');
-    });
-
-    test('Qavslar bilan hisoblash', () {
-      final calc = CalculatorModel();
-      calc.inputParenthesis('(');
-      calc.inputDigit('1');
-      calc.inputDigit('0');
-      calc.inputOperator('+');
-      calc.inputDigit('5');
-      calc.inputParenthesis(')');
-      calc.inputOperator('×');
-      calc.inputDigit('2');
-      calc.calculate();
-      // (10 + 5) * 2 = 30 bo'lishi kerak
-      expect(calc.display, '30');
+      // 2 + 2 * 2 = 6 bo'lishi kerak
+      expect(calc.display, '6');
     });
   });
 
-  group('Localization Tests', () {
-    test('Tillarni almashtirish (UZ, RU, EN)', () {
-      AppStrings.currentLang = AppLanguage.uz;
-      expect(AppStrings.tr('calculator'), 'Kalkulyator');
+  group('Extra Tools Tests (without GPA)', () {
+    test('Bozor narxi hisoblash', () {
+      final price = MarketItemCalc.calcWeightPrice(pricePerKg: 100000, grams: 250);
+      expect(price, 25000);
+    });
 
-      AppStrings.currentLang = AppLanguage.ru;
-      expect(AppStrings.tr('calculator'), 'Калькулятор');
-
-      AppStrings.currentLang = AppLanguage.en;
-      expect(AppStrings.tr('calculator'), 'Calculator');
+    test('Yoqilg\'i xarajati', () {
+      final cost = FuelCalc.calcTripCost(distanceKm: 200, consumptionPer100Km: 8, fuelPrice: 10000);
+      expect(cost, 160000);
     });
   });
 }

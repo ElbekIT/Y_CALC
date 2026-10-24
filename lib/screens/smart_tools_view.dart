@@ -6,7 +6,7 @@ import '../themes/app_theme.dart';
 import '../utils/app_localizations.dart';
 import '../utils/currency_service.dart';
 
-enum SmartToolType { currency, market, fuel, words, gpa, quiz }
+enum SmartToolType { currency, market, fuel, words, quiz }
 
 class SmartToolsView extends StatefulWidget {
   final AppPalette palette;
@@ -42,14 +42,6 @@ class _SmartToolsViewState extends State<SmartToolsView> {
   final _numWordsCtrl = TextEditingController(text: "1500000");
   String _numWordsResult = "bir million besh yuz ming";
 
-  // GPA items
-  final List<GpaItem> _gpaItems = [
-    GpaItem(name: "Matematika", credits: 4, grade: 4.5),
-    GpaItem(name: "Dasturlash", credits: 5, grade: 5.0),
-    GpaItem(name: "Fizika", credits: 3, grade: 4.0),
-  ];
-  double _gpaResult = 4.58;
-
   // Aql charxi (Mini-game)
   MathQuizGenerator _quiz = MathQuizGenerator.randomQuestion(1);
   int _quizScore = 0;
@@ -65,7 +57,6 @@ class _SmartToolsViewState extends State<SmartToolsView> {
     _recalcMarket();
     _recalcFuel();
     _recalcWords();
-    _recalcGpa();
   }
 
   @override
@@ -116,12 +107,6 @@ class _SmartToolsViewState extends State<SmartToolsView> {
     final num = int.tryParse(_numWordsCtrl.text.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
     setState(() {
       _numWordsResult = NumberToWordsUz.convert(num);
-    });
-  }
-
-  void _recalcGpa() {
-    setState(() {
-      _gpaResult = GpaCalc.calculateGpa(_gpaItems);
     });
   }
 
@@ -177,7 +162,7 @@ class _SmartToolsViewState extends State<SmartToolsView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Horizontal tool selector
+        // Horizontal tool selector (GPA siz, faqat kerakli 5 ta vosita)
         SizedBox(
           height: 44,
           child: ListView(
@@ -188,7 +173,6 @@ class _SmartToolsViewState extends State<SmartToolsView> {
               _buildToolChip(AppStrings.tr('marketTrade'), SmartToolType.market, Icons.storefront),
               _buildToolChip(AppStrings.tr('fuelTrip'), SmartToolType.fuel, Icons.local_gas_station),
               _buildToolChip(AppStrings.tr('inWords'), SmartToolType.words, Icons.text_fields),
-              _buildToolChip(AppStrings.tr('studentGpa'), SmartToolType.gpa, Icons.school),
               _buildToolChip(AppStrings.tr('brainQuiz'), SmartToolType.quiz, Icons.sports_esports),
             ],
           ),
@@ -240,8 +224,6 @@ class _SmartToolsViewState extends State<SmartToolsView> {
         return _buildFuelSection();
       case SmartToolType.words:
         return _buildWordsSection();
-      case SmartToolType.gpa:
-        return _buildGpaSection();
       case SmartToolType.quiz:
         return _buildQuizSection();
     }
@@ -400,35 +382,7 @@ class _SmartToolsViewState extends State<SmartToolsView> {
     );
   }
 
-  // 5. GPA
-  Widget _buildGpaSection() {
-    return Column(
-      children: [
-        ..._gpaItems.map((item) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: widget.palette.bgCard,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: widget.palette.divider.withOpacity(0.3)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(item.name, style: TextStyle(color: widget.palette.displayText, fontWeight: FontWeight.w600)),
-                Text("${item.credits} kredit | ${item.grade} ball", style: TextStyle(color: widget.palette.displaySubText)),
-              ],
-            ),
-          );
-        }),
-        const SizedBox(height: 16),
-        _buildResultCard("Umumiy GPA", _gpaResult.toStringAsFixed(2), sub: "Kredit-modul tizimi bo'yicha"),
-      ],
-    );
-  }
-
-  // 6. QUIZ
+  // 5. QUIZ
   Widget _buildQuizSection() {
     return Column(
       children: [
