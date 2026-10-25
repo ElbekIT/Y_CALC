@@ -11,8 +11,11 @@ build/
 .idea/
 .DS_Store
 local.properties
-**/android/key.properties
+key.properties
+**/key.properties
 *.jks
+**/*.jks
 *.keystore
+**/*.keystore
 *.g.dart
 *.freezed.dart

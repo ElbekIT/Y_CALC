@@ -1,23 +1,16 @@
 #!/usr/bin/env bash
 set -e
 
-KEYSTORE="android/app/upload-keystore.jks"
+KEYSTORE="android/upload-keystore.jks"
+KEYSTORE_APP="android/app/upload-keystore.jks"
 PROPERTIES="android/key.properties"
 
 echo "=== 1. Checking files ==="
-if [ ! -f "$KEYSTORE" ]; then
-    echo "ERROR: $KEYSTORE not found!"
-    exit 1
-fi
-echo "[OK] Keystore found: $KEYSTORE"
-
-if [ ! -f "$PROPERTIES" ]; then
-    echo "ERROR: $PROPERTIES not found!"
-    exit 1
-fi
-echo "[OK] Properties found: $PROPERTIES"
+[ -f "$KEYSTORE" ] && echo "[OK] Keystore found: $KEYSTORE" || (echo "[FAIL] Missing $KEYSTORE" && exit 1)
+[ -f "$KEYSTORE_APP" ] && echo "[OK] Keystore found: $KEYSTORE_APP" || (echo "[FAIL] Missing $KEYSTORE_APP" && exit 1)
+[ -f "$PROPERTIES" ] && echo "[OK] Properties found: $PROPERTIES" || (echo "[FAIL] Missing $PROPERTIES" && exit 1)
 
 echo "=== 2. Verifying Keystore Integrity ==="
-keytool -list -v -keystore "$KEYSTORE" -storepass "YCalcUploadPass2026!" | grep -E "Alias name|Valid from|Owner|SHA256"
+keytool -list -v -keystore "$KEYSTORE" -storepass "AlgorixSecurePass2026!" | grep -E "Alias name|Valid from|Owner|SHA256"
 
 echo "=== ALL CHECKS PASSED ==="
