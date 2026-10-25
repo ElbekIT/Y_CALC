@@ -104,6 +104,16 @@ class AppStrings {
       AppLanguage.ru: 'Тренажер ума',
       AppLanguage.en: 'Brain Quiz',
     },
+    'privacyPolicy': {
+      AppLanguage.uz: 'Maxfiylik siyosati',
+      AppLanguage.ru: 'Политика конфиденциальности',
+      AppLanguage.en: 'Privacy Policy',
+    },
+    'aboutApp': {
+      AppLanguage.uz: 'Ilova haqida',
+      AppLanguage.ru: 'О приложении',
+      AppLanguage.en: 'About App',
+    },
   };
 
   static String tr(String key) {

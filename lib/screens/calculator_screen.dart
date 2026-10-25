@@ -14,6 +14,7 @@ import 'finance_view.dart';
 import 'programmer_view.dart';
 import 'smart_tools_view.dart';
 import 'history_sheet.dart';
+import '../utils/privacy_policy.dart';
 
 enum AppMode {
   calculator,
@@ -363,6 +364,69 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
+  void _openAboutModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: _palette.bgSecondary,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: _palette.divider,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: _palette.accent.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(Icons.calculate, color: _palette.accent, size: 32),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              "ALGORIX",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+                color: _palette.displayText,
+              ),
+            ),
+            Text(
+              "Version 1.0.0",
+              style: TextStyle(
+                fontSize: 12,
+                color: _palette.displaySubText,
+              ),
+            ),
+            const SizedBox(height: 20),
+            PrivacyPolicyService.buildTile(
+              context: context,
+              iconColor: _palette.accent,
+              textColor: _palette.displayText,
+              tileColor: _palette.bgCard,
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -535,8 +599,15 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           // Theme Switcher
           IconButton(
             icon: Icon(Icons.palette_outlined, color: _palette.displaySubText, size: 22),
-            tooltip: "Mavzu",
+            tooltip: AppStrings.tr('theme'),
             onPressed: _openThemeSelector,
+          ),
+
+          // About & Privacy Policy
+          IconButton(
+            icon: Icon(Icons.info_outline, color: _palette.displaySubText, size: 22),
+            tooltip: AppStrings.tr('aboutApp'),
+            onPressed: _openAboutModal,
           ),
         ],
       ),
