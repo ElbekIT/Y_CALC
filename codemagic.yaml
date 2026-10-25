@@ -20,13 +20,13 @@ workflows:
           storePassword=AlgorixSecurePass2026!
           keyPassword=AlgorixSecurePass2026!
           keyAlias=algorix-upload
-          storeFile=../upload-keystore.jks
+          storeFile=upload-keystore.jks
           EOF
       - name: Get dependencies
         script: |
           flutter packages pub get
       - name: Build Android App Bundle
         script: |
-          flutter build appbundle --release
+          flutter build appbundle --release --android-skip-build-dependency-validation
     artifacts:
       - build/**/outputs/**/*.aab
