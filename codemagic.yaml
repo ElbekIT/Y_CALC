@@ -7,6 +7,18 @@ workflows:
       flutter: stable
       java: 17
     scripts:
+      - name: Set up code signing
+        script: |
+          if [ -n "$CM_KEYSTORE" ]; then
+            echo "Setting up keystore from Codemagic environment..."
+            echo "$CM_KEYSTORE" | base64 --decode > android/app/upload-keystore.jks
+            cat <<EOF > android/key.properties
+          storePassword=$CM_KEYSTORE_PASSWORD
+          keyPassword=$CM_KEY_PASSWORD
+          keyAlias=$CM_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
+          fi
       - name: Get dependencies
         script: |
           flutter packages pub get
