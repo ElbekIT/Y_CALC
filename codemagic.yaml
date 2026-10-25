@@ -8,7 +8,7 @@ workflows:
       java: 17
     scripts:
       - name: Set up code signing
-      script: |
+        script: |
           set -e
           echo "Setting up keystore and key.properties..."
           mkdir -p android/app
