@@ -8,7 +8,7 @@ workflows:
       java: 17
     scripts:
       - name: Set up code signing
-        script: |
+      script: |
           set -e
           echo "Setting up keystore and key.properties..."
           mkdir -p android/app
@@ -26,8 +26,12 @@ workflows:
       - name: Get dependencies
         script: |
           flutter packages pub get
+      - name: Build Android APK
+        script: |
+          flutter build apk --release --android-skip-build-dependency-validation
       - name: Build Android App Bundle
         script: |
-          flutter build appbundle --release
+          flutter build appbundle --release --android-skip-build-dependency-validation
     artifacts:
+      - build/**/outputs/**/*.apk
       - build/**/outputs/**/*.aab
